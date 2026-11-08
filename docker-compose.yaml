@@ -1,0 +1,12 @@
+services:
+  neon-serpent:
+    image: node:22-alpine        # stock public image — nothing to build
+    container_name: neon-serpent
+    command: node /app/server.js
+    working_dir: /app
+    volumes:
+      - ./:/app:ro               # this folder, mounted read-only
+    ports:
+      - "8088:8088"
+    user: node                   # non-root; comment out if you see EACCES
+    restart: unless-stopped
