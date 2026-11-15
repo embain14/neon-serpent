@@ -393,6 +393,9 @@ function onGame(d, from){
       if (mode === "client"){
         leftGame = false;
         audioOn = d.snd !== false; initAudio();
+        state = null; foods = []; drops = []; obstacles = []; particles = []; effects = [];
+        players.forEach((p) => { p.body = []; p.alive = false; p.deathT = 0; p.boost = false; p.want = 0; });
+        stopClientRender(); startClientRender();
         show("game"); buildHud(); resize();
         cdActive = true;
         let n = 3;
@@ -696,7 +699,7 @@ function makeObstacles(){
 }
 function startMatch(c){
   clearInterval(countdownInt); clearInterval(gameInt);
-  inputQueue = { q: [] }; particles = []; effects = []; state = null;
+  inputQueue = { q: [] }; particles = []; effects = []; state = null; foods = []; drops = [];
   makeObstacles();
   order.forEach((id) => {
     const p = players.get(id);
@@ -1028,6 +1031,8 @@ function resize(){
   cell = r.width / GRID;
 }
 function rr(c, x, y, w, h, rad){
+  w = Math.max(0, w || 0); h = Math.max(0, h || 0);
+  rad = Math.max(0, Math.min(rad || 0, w / 2, h / 2));
   if (c.roundRect) { c.beginPath(); c.roundRect(x, y, w, h, rad); return; }
   c.beginPath(); c.moveTo(x + rad, y); c.arcTo(x + w, y, x + w, y + h, rad); c.arcTo(x + w, y + h, x, y + h, rad); c.arcTo(x, y + h, x, y, rad); c.arcTo(x, y, x + w, y, rad); c.closePath();
 }
@@ -1077,7 +1082,7 @@ function render(){
       let a = 1;
       if (!p.alive){
         if (age > 420) continue;
-        const f = age / 420; a = 1 - f; sz *= 1 + f * 1.6;
+        const f = Math.max(0, age) / 420; a = 1 - f; sz *= 1 + f * 1.6;
       }
       ctx.save(); ctx.globalAlpha = a;
       const light = 62 - (1 - i / n) * 18;
@@ -1137,21 +1142,32 @@ function startClientRender(){
   if (renderOn) return;
   renderOn = true;
   const loop = () => {
-    if (state && state.oids){
-      const tSnap = state.t || performance.now();
-      for (const b of state.oids){
-        let p = players.get(b.id);
-        if (!p){ p = player(b.id, b.name, b.hue); players.set(b.id, p); if (!order.includes(b.id)) order.push(b.id); }
-        if (b.hue !== undefined && b.hue !== p.hue){ p.hue = b.hue; p.color = "hsl(" + b.hue + " 100% 62%)"; }
-        p.x = b.x; p.y = b.y; p.len = b.len; p.alive = !!b.alive; p.score = b.score || 0; p.lives = b.lives;
-        p.body = (b.body || []).map((s) => (s ? { x: s[0], y: s[1], t: tSnap } : null));
+    try {
+      if (state && state.oids){
+        /* Use the CLIENT clock for render timing. state.t is the host's performance.now(),
+           which is unrelated to ours; mixing them made dead-snake fade ages negative,
+           producing a negative roundRect radius -> RangeError -> render loop died. */
+        const nowL = performance.now();
+        for (const b of state.oids){
+          let p = players.get(b.id);
+          if (!p){ p = player(b.id, b.name, b.hue); players.set(b.id, p); if (!order.includes(b.id)) order.push(b.id); }
+          if (b.hue !== undefined && b.hue !== p.hue){ p.hue = b.hue; p.color = "hsl(" + b.hue + " 100% 62%)"; }
+          const wasAlive = p.alive;
+          p.alive = !!b.alive;
+          if (p.alive) p.deathT = 0;
+          else if (wasAlive) p.deathT = nowL;              // just died: start fade now
+          else if (!p.deathT) p.deathT = nowL - 1000;      // first seen dead: already faded
+          const segT = p.alive ? nowL : p.deathT;
+          p.x = b.x; p.y = b.y; p.len = b.len; p.score = b.score || 0; p.lives = b.lives;
+          p.body = (b.body || []).map((s) => (s ? { x: s[0], y: s[1], t: segT } : null));
+        }
+        obstacles = state.obs || []; foods = state.fd || [];
+        drops = (state.dp || []).map((d) => ({ x: d[0], y: d[1], c: d[2], t: performance.now() }));
+        const p = me(); if (p && state.me){ p.score = state.me.score; p.len = state.me.len; p.lives = state.me.lives; }
+        cfg = cfg || freshCfg(); cfg.wrap = !!state.w;
       }
-      obstacles = state.obs || []; foods = state.fd || [];
-      drops = (state.dp || []).map((d) => ({ x: d[0], y: d[1], c: d[2], t: performance.now() }));
-      const p = me(); if (p && state.me){ p.score = state.me.score; p.len = state.me.len; p.lives = state.me.lives; }
-      cfg = cfg || freshCfg(); cfg.wrap = !!state.w;
-    }
-    render(); updateHud();
+      render(); updateHud();
+    } catch (e) { console.error("render loop error:", e); }   // never let one bad frame freeze the client
     if (renderOn) rafId = requestAnimationFrame(loop);
   };
   rafId = requestAnimationFrame(loop);
