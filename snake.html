@@ -51,6 +51,24 @@
   .small{color:var(--dim); font-size:13px; letter-spacing:.08em}
 
   .hud{display:flex; flex-direction:column; gap:12px; width:min(430px,94vw)}
+  /* big live scoreboard (game HUD) */
+  #hudScores{display:flex; gap:10px; flex-wrap:wrap}
+  #hudScores .pl{display:flex; align-items:center; gap:10px; padding:8px 14px; border-radius:12px; border:1px solid var(--line); background:#0a0a16; min-width:130px}
+  #hudScores .pl .who{font-size:12px; font-weight:700; letter-spacing:.04em; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100px}
+  #hudScores .pl .pl-score{font-size:32px; font-weight:900; line-height:1; min-width:2ch; text-align:center; font-variant-numeric:tabular-nums; text-shadow:0 0 12px currentColor}
+  #hudScores .pl .pl-lives{font-size:11px; letter-spacing:2px; opacity:.8}
+  #hudScores .pl.me{border-color:var(--neon); box-shadow:0 0 14px rgba(0,229,255,.18)}
+  #hudScores .pl.dead{opacity:.5}
+  /* giant final-score board (game over) */
+  .bigboard{display:flex; gap:22px; justify-content:center; flex-wrap:wrap; margin:6px 0}
+  .bigcard{min-width:150px; padding:16px 22px 14px; border-radius:16px; border:2px solid var(--line); background:#0a0a16; text-align:center; position:relative}
+  .bigcard .bc-name{font-size:12px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:var(--dim)}
+  .bigcard .bc-score{font-size:84px; font-weight:900; line-height:1.05; font-variant-numeric:tabular-nums}
+  .bigcard.win{box-shadow:0 0 30px rgba(0,229,255,.15)}
+  .bigcard.lose{opacity:.7}
+  .bigcard.lose .bc-score{color:var(--dim); text-shadow:none}
+  .bigcard .bc-crown{position:absolute; top:-16px; right:-4px; font-size:26px; filter:drop-shadow(0 0 8px rgba(255,232,106,.6))}
+  .bigcard .bc-you{display:inline-block; margin-top:2px; font-size:10px; letter-spacing:.14em; padding:2px 8px; border-radius:999px; border:1px solid rgba(0,229,255,.5); color:var(--cyan)}
   .panel-h{font-size:11px; color:var(--dim); letter-spacing:.3em; text-transform:uppercase; border-bottom:1px dashed var(--line); padding-bottom:8px; margin-bottom:10px}
   .row{display:flex; gap:8px; align-items:center; flex-wrap:wrap}
   .grow{flex:1 1 auto}
@@ -891,16 +909,23 @@ function endMatch(winnerId){
 }
 function doWin(d){
   const btns = $("overBtns"); btns.innerHTML = "";
-  const list = order.map((id) => players.get(id)).sort((a, b) => b.score - a.score);
-  $("finalScores").innerHTML = "";
-  list.forEach((p, i) => {
-    const div = document.createElement("div");
-    div.style.cssText = "display:flex;gap:10px;padding:5px 0;border-bottom:1px dashed var(--line);color:var(--text);font-size:14px";
-    div.innerHTML = '<span style="width:22px;color:var(--dim)">' + (i + 1) + '.</span><span style="width:12px;height:12px;border-radius:3px;background:' + p.color + ';box-shadow:0 0 8px ' + p.color + '"></span><span style="flex:1">' + esc(p.name) + (p.id === myId ? " (you)" : "") + '</span><b>' + p.score + "</b>";
-    $("finalScores").appendChild(div);
+  const list = order.map((id) => players.get(id)).filter(Boolean).sort((a, b) => b.score - a.score);
+  const board = $("finalScores"); board.innerHTML = "";
+  const wrap = document.createElement("div"); wrap.className = "bigboard";
+  list.forEach((p) => {
+    const card = document.createElement("div");
+    const isWin = d.winner != null && p.id === d.winner;
+    card.className = "bigcard " + (d.winner == null ? "" : (isWin ? "win" : "lose"));
+    card.style.color = p.color;
+    card.innerHTML = (isWin ? '<span class="bc-crown">👑</span>' : "") +
+      '<div class="bc-name"></div><div class="bc-score" style="color:' + p.color + '">' + p.score + "</div>" +
+      (p.id === myId ? '<span class="bc-you">YOU</span>' : "");
+    card.querySelector(".bc-name").textContent = p.name;
+    wrap.appendChild(card);
   });
+  board.appendChild(wrap);
   const w = players.get(d.winner);
-  $("winMsg").textContent = w ? (w.name === me().name ? "You win!" : w.name + " wins!") : "Match over";
+  $("winMsg").textContent = w ? (d.winner === myId ? "You win!" : w.name + " wins!") : "Match over";
   $("winMsg").style.color = w ? w.color : "var(--text)";
   $("winMsg").style.textShadow = w ? "0 0 24px " + w.color : "none";
   if (mode === "host"){
@@ -969,9 +994,25 @@ function updateHud(){
     box.appendChild(div);
   });
   const sbox = $("hudScores");
-  const m0 = me();
-  if (sbox && m0){
-    sbox.innerHTML = '<div style="display:flex;gap:18px;font-size:13px;letter-spacing:.1em"><span>SCORE <b style="color:var(--neon);font-size:17px">' + m0.score + '</b></span><span>LIVES <b style="color:var(--mag);font-size:17px">' + m0.lives + '</b></span>' + (cfg && cfg.target > 0 ? '<span>TARGET <b style="color:var(--amber);font-size:17px">' + cfg.target + '</b></span>' : '') + "</div>";
+  if (sbox){
+    const list = order.map((id) => players.get(id)).filter(Boolean).sort((a, b) => b.score - a.score);
+    sbox.innerHTML = "";
+    list.forEach((q) => {
+      const div = document.createElement("div");
+      div.className = "pl" + (q.id === myId ? " me" : "") + (q.alive === false ? " dead" : "");
+      div.style.color = q.color;
+      div.innerHTML = '<span class="dot"></span><span class="who" style="color:var(--text)"></span>' +
+        '<span class="pl-score"></span>' + (q.id === myId ? '<span class="pl-lives">♥' + q.lives + "</span>" : "");
+      div.querySelector(".who").textContent = q.name + (q.id === myId ? " (you)" : "");
+      div.querySelector(".pl-score").textContent = q.score;
+      sbox.appendChild(div);
+    });
+    if (cfg && cfg.target > 0){
+      const t = document.createElement("div");
+      t.className = "small"; t.style.alignSelf = "center";
+      t.innerHTML = 'TARGET <b style="color:var(--amber)">' + cfg.target + "</b>";
+      sbox.appendChild(t);
+    }
   }
   const cw = $("cdWrap");
   if (cw && !cdActive) cw.classList.add("hidden");
@@ -1163,7 +1204,9 @@ function startClientRender(){
         }
         obstacles = state.obs || []; foods = state.fd || [];
         drops = (state.dp || []).map((d) => ({ x: d[0], y: d[1], c: d[2], t: performance.now() }));
-        const p = me(); if (p && state.me){ p.score = state.me.score; p.len = state.me.len; p.lives = state.me.lives; }
+        /* NOTE: per-player score/lives arrive via state.oids above (b.score, b.lives).
+           Do NOT copy state.me onto me(): state.me is the HOST's own player object,
+           so that made the client show the host's score as its own → fake ties. */
         cfg = cfg || freshCfg(); cfg.wrap = !!state.w;
       }
       render(); updateHud();
