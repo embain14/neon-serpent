@@ -26,6 +26,16 @@ Neon Serpent LAN server ready
 
 Works on any device with a browser — desktop (arrows / WASD) and phones (swipe anywhere on the board).
 
+## Screenshots
+
+| Home | Lobby |
+|---|---|
+| ![home](Neon_Serpent_Screenshots/Home%20Screen.png) | ![lobby](Neon_Serpent_Screenshots/Lobby%20%28Host%29.png) |
+
+| In game | Final scoreboard |
+|---|---|
+| ![game](Neon_Serpent_Screenshots/In%20Game%20%28Host%29.png) | ![scores](Neon_Serpent_Screenshots/Final%20Scoreboard%20%28Host%29.png) |
+
 ### Run it in Docker
 
 ```bash
@@ -61,7 +71,8 @@ Room lifecycle: host creates a code → clients join by code (or Scan) → all r
 | ⚙️ match settings | speed (Chill→Turbo), target score (10/25/50/∞), lives (1/3/5), food, obstacles, wall-wrap, sound |
 | 💬 lobby + in-game chat | works both directions, host relays |
 | 📱 touch support | swipe / virtual joystick, tested on phones |
-| 🔊 synth audio | WebAudio bleeps, no asset files |
+| 🔊 synth audio + chiptune | WebAudio bleeps **and** a generated 8-bit soundtrack — menu and match loops, win jingle, no asset files; tap the title to mute |
+| 🏆 big-number scoreboard | giant glowing final scores, win/tie banner, per-player ♥ lives visible to everyone |
 | 🔎 room scanner | one tap lists open rooms on the LAN |
 | 🔁 rematches | same lobby, fresh game, colors and ready-state restored |
 | 💀 respawn w/ i-frames | collisions cost a life, not the match |
@@ -70,7 +81,7 @@ Room lifecycle: host creates a code → clients join by code (or Scan) → all r
 
 ```
 server.js         zero-dep Node HTTP + WebSocket relay, static file server (~260 lines)
-snake.html        the entire game: menu, lobby, engine, renderer, audio (~1,250 lines)
+snake.html        the entire game: menu, lobby, engine, renderer, audio (~1,400 lines)
 docker-compose.yaml  optional: run the server as a container
 ```
 
